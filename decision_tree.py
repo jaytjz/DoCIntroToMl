@@ -1,11 +1,21 @@
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
+from dataclasses import dataclass
+
+@dataclass
+class Node:
+    attribute: int = None
+    value: float = None
+    left: 'Node' = None
+    right: 'Node' = None
+    terminal: bool = False
+    depth: int = 0
 
 class DecisionTree:
     def __init__(self, n_classes):
         """Initializes the DecisionTree."""
-        self.tree = None
+        self.root = None
         self.depth = 0
         self.n_classes = n_classes
         
@@ -15,11 +25,11 @@ class DecisionTree:
         y_hat = np.empty(n, dtype=int)
 
         # Traverse the tree for each test instance
-        for i in range(n):
-            node = self.tree
-            while not node['terminal']:
-                node = node['left'] if X_test[i, node['attribute']] <= node['value'] else node['right']
-            y_hat[i] = node['value']
+        for i, x in enumerate(X_test):
+            node = self.root
+            while not node.terminal:
+                node = node.left if x[node.attribute] <= node.value else node.right
+            y_hat[i] = node.value
 
         return y_hat
 
@@ -29,19 +39,19 @@ class DecisionTree:
         
         # Return a leaf node if all labels are the same
         if np.all(y == y[0]):
-            return {'attribute': None, 'value': int(y[0]), 'left': None, 'right': None, 'terminal': True}, depth
+            return Node(value=int(y[0]), terminal=True, depth=depth), depth
 
         # Find the best split
-        split_attribute, split_value, left_indices, right_indices = self.find_split(X, y)
-        if split_attribute is None or left_indices.size == 0 or right_indices.size == 0:
+        split_attribute, split_value, left, right = self.find_split(X, y)
+        if split_attribute is None or left.size == 0 or right.size == 0:
             majority_class = int(np.argmax(np.bincount(y, minlength=self.n_classes + 1)))
-            return {'attribute': None, 'value': majority_class, 'left': None, 'right': None, 'terminal': True}, depth
+            return Node(value=majority_class, terminal=True, depth=depth), depth
 
         # Recursively build the left and right branches
-        l_branch, l_depth = self.decision_tree_learning(ds[left_indices], depth + 1)
-        r_branch, r_depth = self.decision_tree_learning(ds[right_indices], depth + 1)
+        l_branch, l_depth = self.decision_tree_learning(ds[left], depth + 1)
+        r_branch, r_depth = self.decision_tree_learning(ds[right], depth + 1)
 
-        return {'attribute': split_attribute, 'value': split_value, 'left': l_branch, 'right': r_branch, 'terminal': False}, max(l_depth, r_depth)
+        return Node(attribute=split_attribute, value=split_value, left=l_branch, right=r_branch, terminal=False, depth=depth), max(l_depth, r_depth)
 
     def find_split(self, X, y):
         """Finds the best attribute and value to split the data."""
@@ -74,19 +84,13 @@ class DecisionTree:
             # Calculate entropy of the left split
             n_left = candidates
             l_counts = prefix_sums[candidates - 1]
-            p_left = np.divide(l_counts, n_left[:, None], out=np.zeros_like(l_counts, dtype=float), where=n_left[:, None] > 0)
-            log_p_left = np.zeros_like(p_left)
-            np.log2(p_left, out=log_p_left, where=(p_left > 0))
-            H_left  = -np.sum(p_left * log_p_left, axis=1)
-
+            H_left = self.vector_entropy(n_left, l_counts)
+            
             # Calculate entropy of the right split
             n_right = n - n_left
             r_counts = prefix_sums[-1] - l_counts
-            p_right = np.divide(r_counts, n_right[:, None], out=np.zeros_like(r_counts, dtype=float), where=n_right[:, None] > 0)
-            log_p_right = np.zeros_like(p_right)
-            np.log2(p_right, out=log_p_right, where=(p_right > 0))
-            H_right = -np.sum(p_right * log_p_right, axis=1)
-
+            H_right = self.vector_entropy(n_right, r_counts)
+            
             # Calculate information gain and update best split if necessary
             ig = H_parent - (n_left / n) * H_left - (n_right / n) * H_right
             k = np.argmax(ig)
@@ -106,17 +110,23 @@ class DecisionTree:
 
         return best_attribute, best_split_value, best_left, best_right
 
+    def vector_entropy(self, n, counts):
+        """Calculates the entropy for a batch of class-count rows."""
+        p = np.divide(counts, n[:, None], out=np.zeros_like(counts, dtype=float), where=n[:, None] > 0)
+        logp = np.zeros_like(p)
+        np.log2(p, out=logp, where=p > 0)
+        return -(p * logp).sum(axis=1)
+
     def entropy(self, y):
         """Calculates the entropy of the class labels."""
-        counts = np.bincount(y, minlength=self.n_classes + 1)
-        probabilities = counts[1:] / counts.sum()
-        probabilities = probabilities[probabilities > 0]
-        return -np.dot(probabilities, np.log2(probabilities))
+        _, counts = np.unique(y, return_counts=True)
+        p = counts / counts.sum()
+        return float(-(p * np.log2(p)).sum())
 
     def visualise_tree(self, figsize):
         """Plots the decision tree."""
         fig, ax = plt.subplots(figsize=figsize)
-        tree = self.tree
+        root = self.root
         counter = itertools.count()
         pos = {}
         
@@ -124,14 +134,14 @@ class DecisionTree:
             """In-order traversal to assign positions to nodes."""
             if n is None:
                 return
-            if not n['terminal']:
-                traverse_inorder(n['left'], depth + 1)
+            if not n.terminal:
+                traverse_inorder(n.left, depth + 1)
             pos[id(n)] = (next(counter), -depth)
-            if not n['terminal']:
-                traverse_inorder(n['right'], depth + 1)
+            if not n.terminal:
+                traverse_inorder(n.right, depth + 1)
 
-        traverse_inorder(tree, 0)
-        
+        traverse_inorder(root, 0)
+
         # Normalize x-coordinates
         xs = [x for x, _ in pos.values()]
         x_min, x_max = min(xs), max(xs)
@@ -142,16 +152,16 @@ class DecisionTree:
         
         def label(n):
             """Generates the label for a node."""
-            if n['terminal']:
-                return f"Leaf {int(n['value'])}"
-            return f"X{n['attribute']} ≤ {n['value']}"
-        
+            if n.terminal:
+                return f"R{int(n.value)}"
+            return f"X{n.attribute} ≤ {n.value}"
+
         def draw_edges(n):
             """Draws the edges of the tree."""
-            if n is None or n['terminal']:
+            if n is None or n.terminal:
                 return
             x0, y0 = pos[id(n)]
-            for child in [n['left'], n['right']]:
+            for child in [n.left, n.right]:
                 x1, y1 = pos[id(child)]
                 ax.plot([x0, x1], [y0, y1], color='black')
                 draw_edges(child)
@@ -161,12 +171,12 @@ class DecisionTree:
             if n is None:
                 return
             out.append(n)
-            collect(n['left'], out)
-            collect(n['right'], out)
+            collect(n.left, out)
+            collect(n.right, out)
 
         nodes = []
-        draw_edges(tree)
-        collect(tree, nodes)
+        draw_edges(root)
+        collect(root, nodes)
 
         # Draw nodes
         for n in nodes:

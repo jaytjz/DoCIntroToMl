@@ -51,12 +51,13 @@ class KFoldValidator:
 
             # Train the decision tree model
             model = DecisionTree(n_classes=self.n_classes)
-            model.tree, model.depth = model.decision_tree_learning(train, 0)
+            model.root, model.depth = model.decision_tree_learning(train, 0)
             self.models.append(model)
 
             # Predict on the test set and compute confusion matrix
             y_hat = model.predict(X_test)
-            cms.append(self.confusion_matrix((y_test, y_hat)))
+            cm = self.confusion_matrix((y_test, y_hat))
+            cms.append(cm)
 
         return self.evaluate(cms, False)
 
@@ -70,6 +71,12 @@ class KFoldValidator:
             # Populate the confusion matrix, normalise to 0-based indexing
             np.add.at(cm, (y_true - 1, y_pred - 1), 1)
         return cm
+
+    def compute_accuracy(self, confusion_matrix):
+        """Computes the accuracy from the confusion matrix."""
+        total = np.sum(confusion_matrix)
+        correct = np.diag(confusion_matrix)
+        return (correct / total) if total > 0 else 0
 
     def evaluate(self, confusion_matrices, single_fold=True):
         """Evaluates the model performance using the confusion matrices."""
