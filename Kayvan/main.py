@@ -28,7 +28,7 @@ def find_split(training_dataset):
                     max_info_gain = (information_gain,column_index,split_value)
     return max_info_gain
 
-def decision_tree_learning(training_dataset,depth=0):
+def decision_tree_learning(training_dataset, depth=0):
     classes = training_dataset.transpose()[-1]
     if (np.all(classes == classes[0])):
         return (Node(-1,classes[0],None,None, True),depth)
@@ -36,8 +36,16 @@ def decision_tree_learning(training_dataset,depth=0):
     l_branch, l_depth = decision_tree_learning(training_dataset[training_dataset[:,column_index] < split_value] ,depth+1)
     r_branch, r_depth = decision_tree_learning(training_dataset[training_dataset[:,column_index] >= split_value],depth+1)
     return (Node(column_index,split_value,l_branch,r_branch,False), max(l_depth,r_depth))
-    
-def train(data, test_proportion, seed):
+
+def test(root, test_data):
+    correct_predictions = 0
+    for instance in test_data:
+        prediction = root.traverse_tree(instance)
+        if prediction == instance[-1]:
+            correct_predictions += 1
+    return correct_predictions/len(test_data)
+   
+def train(data, test_proportion, seed, prune=False):
     shuffled_indices = default_rng(seed).permutation(len(data))
     n_test = round(len(data) * test_proportion)
     n_train = len(data) - n_test
@@ -46,20 +54,24 @@ def train(data, test_proportion, seed):
 
     root, depth = decision_tree_learning(training_data)
     print(f"Depth data {depth}")
-    root.prune_tree()
-    return (root, testing_data)
-
-def test(root,test_data):
-    correct_predictions = 0
-    for instance in test_data:
-        prediction = root.traverse_tree(instance)
-        if prediction == instance[-1]:
-            correct_predictions += 1
-    return correct_predictions/len(test_data)
+    return (root, testing_data, depth)
 
 if __name__ == "__main__":
     clean = np.loadtxt("clean_dataset.txt")
     noisy = np.loadtxt("noisy_dataset.txt")
-    clean_root, clean_testing_data = train(clean,0.2,4)
-    print(f"Clean decision tree accuracy on clean test data = {100*test(clean_root,clean_testing_data)}%")
-    print(f"Clean decision tree accuracy on noisy test data = {100*test(clean_root,noisy)}%")
+    min_depth = 1000000000
+    # This is just for me because I wanted to test the visualisation at different depths no need to iterate through like this to make a decision tree
+    for i in range(1):
+        clean_root, clean_testing_data, depth = train(clean,0.2,i)
+        if depth < min_depth:
+            min_root = clean_root
+            min_depth = depth
+            min_testing_data = clean_testing_data
+    
+    # clean_root.draw_tree()
+    print(f"Clean decision tree accuracy on clean test data before aggressive pruning = {100*test(min_root,min_testing_data)}%")
+    print(f"Clean decision tree accuracy on noisy test data before aggressive pruning = {100*test(min_root,noisy)}%")
+    min_root.prune_until_converged(min_testing_data,min_root,test)
+    print(f"Clean decision tree accuracy on clean test data after aggressive pruning = {100*test(min_root,min_testing_data)}%")
+    print(f"Clean decision tree accuracy on noisy test data after aggressive pruning = {100*test(min_root,noisy)}%")
+    clean_root.draw_tree()
