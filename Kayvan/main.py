@@ -46,16 +46,22 @@ def test(root, test_data):
     return correct_predictions/len(test_data)
    
 def train(data, test_proportion, prune_proportion, seed):
+def train(data, test_proportion, prune_proportion, seed):
     shuffled_indices = default_rng(seed).permutation(len(data))
     n_test = round(len(data) * test_proportion)
+    n_prune = round(len(data)*prune_proportion)
+    n_train = len(data) - (n_test+n_prune)
     n_prune = round(len(data)*prune_proportion)
     n_train = len(data) - (n_test+n_prune)
     training_data = data[shuffled_indices[:n_train]]
     pruning_data = data[shuffled_indices[n_train:n_train+n_prune]]
     testing_data = data[shuffled_indices[n_train+n_prune:]]
+    pruning_data = data[shuffled_indices[n_train:n_train+n_prune]]
+    testing_data = data[shuffled_indices[n_train+n_prune:]]
 
     root, depth = decision_tree_learning(training_data)
     print(f"Depth data {depth}")
+    return (root, testing_data, pruning_data, depth)
     return (root, testing_data, pruning_data, depth)
 
 if __name__ == "__main__":
@@ -78,5 +84,12 @@ if __name__ == "__main__":
     noisy_root.prune_until_converged(noisy_pruning_data,noisy_root,test)
     print(f"Clean decision tree accuracy on clean test data after aggressive pruning = {100*test(clean_root,clean_testing_data)}%")
     print(f"Noisy decision tree accuracy on noisy test data after aggressive pruning = {100*test(noisy_root,noisy_testing_data)}%")
+    print(f"Clean decision tree accuracy on clean test data before aggressive pruning = {100*test(clean_root,clean_testing_data)}%")
+    print(f"Noisy decision tree accuracy on noisy test data before aggressive pruning = {100*test(noisy_root,noisy_testing_data)}%")
+    clean_root.prune_until_converged(clean_pruning_data,clean_root,test)
+    noisy_root.prune_until_converged(noisy_pruning_data,noisy_root,test)
+    print(f"Clean decision tree accuracy on clean test data after aggressive pruning = {100*test(clean_root,clean_testing_data)}%")
+    print(f"Noisy decision tree accuracy on noisy test data after aggressive pruning = {100*test(noisy_root,noisy_testing_data)}%")
     clean_root.draw_tree()
+    noisy_root.draw_tree()
     noisy_root.draw_tree()
