@@ -66,8 +66,7 @@ def plot_confusion(cm):
     plt.show()
 
 
-def shuffle(data):
-
+def shuffle(data, max_depth):
     shuffled_indices = default_rng().permutation(len(data))
     n_test = round(len(data) * 0.1)
     n_train = len(data) - n_test
@@ -75,7 +74,7 @@ def shuffle(data):
     df_test = data[shuffled_indices[n_train:]]
 
     tree = DecisionTree()
-    tree.fit(df_train)
+    tree.fit(df_train, max_depth)
     print(f"Tree depth: {tree.depth}")
     # plot_tree(tree.root, tree.depth)
 
@@ -105,11 +104,14 @@ def main():
     data_path_noisy = os.path.join(script_dir, '..', 'wifi_db', 'noisy_dataset.txt')
     data_clean = np.loadtxt(data_path_clean)
     data_noisy = np.loadtxt(data_path_noisy)
+
+    clean_max_depth = 15
+    noisy_max_depth = 5
     
-    df_test_clean, tree_clean = shuffle(data_clean)
+    df_test_clean, tree_clean = shuffle(data_clean, clean_max_depth)
     correct_clean = testing(df_test_clean, tree_clean)
 
-    df_test, tree = shuffle(data_noisy)
+    df_test, tree = shuffle(data_noisy, noisy_max_depth)
     correct_noisy = testing(df_test, tree)
 
     print(f"\nAccuracy on 200 clean samples: {correct_clean}/200 = {100*correct_clean/200:.1f}%")

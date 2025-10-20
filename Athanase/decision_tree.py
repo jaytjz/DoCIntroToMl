@@ -56,17 +56,20 @@ class DecisionTree:
 
         return l_data, r_data, feature, cond
 
-    def build_tree(self, data, depth):
+    def build_tree(self, data, depth, max_depth):
         if len(np.unique(data[:,7])) == 1:
             return data[0, 7], depth
+        elif max_depth == depth:
+            labels, counts = np.unique(data[:, 7], return_counts=True)
+            return labels[np.argmax(counts)], depth
 
         l_dataset, r_dataset, feature, cond = self.find_split(data)
-        l_branch, l_depth = self.build_tree(l_dataset, depth+1)
-        r_branch, r_depth = self.build_tree(r_dataset, depth+1)
+        l_branch, l_depth = self.build_tree(l_dataset, depth+1, max_depth)
+        r_branch, r_depth = self.build_tree(r_dataset, depth+1, max_depth)
         return node(feature, cond, l_branch, r_branch), max(l_depth, r_depth)
 
-    def fit(self, data):
-        self.root, self.depth = self.build_tree(data, 0)
+    def fit(self, data, max_depth):
+        self.root, self.depth = self.build_tree(data, 0, max_depth)
         return self
 
     def predict(self, x):
