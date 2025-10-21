@@ -1,3 +1,4 @@
+from platform import node
 import numpy as np
 import itertools
 import matplotlib.pyplot as plt
@@ -109,6 +110,33 @@ class DecisionTree:
         best_right = np.nonzero(X[:, best_attribute] > best_split_value)[0]
 
         return best_attribute, best_split_value, best_left, best_right
+    
+    def prune(self, val_ds, node, acc_func, cm_func, print_prunes=False):
+        if not node.terminal:
+            self.prune(val_ds, node.left, acc_func, cm_func, print_prunes)
+            self.prune(val_ds, node.right, acc_func, cm_func, print_prunes)
+
+            X_val, y_val = val_ds[:, :-1], val_ds[:, -1].astype(int)
+            old_node = node
+            
+            def try_prune_to(X_val, y_val, new_value, old_node):
+                old_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
+
+                new_node = Node(value=new_value, terminal=True)
+                new_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
+
+                if new_accuracy < old_accuracy:
+                    return old_node
+                else:
+                    if print_prunes:
+                        print("Succesful prune")
+
+                return new_node
+
+            if node.left and node.left.terminal:
+                node.left = try_prune_to(X_val, y_val, node.left.value, old_node)
+            if node.right and node.right.terminal:
+                node.right = try_prune_to(X_val, y_val, node.right.value, old_node)
 
     def vector_entropy(self, n, counts):
         """Calculates the entropy for a batch of class-count rows."""

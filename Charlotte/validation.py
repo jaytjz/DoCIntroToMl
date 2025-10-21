@@ -52,14 +52,12 @@ class KFoldValidator:
         cms = []
         for train, test in self.splits:
             X_test, y_test = test[:, :-1], test[:, -1].astype(int)
-
             train, val = self.split_validation(train)
-            X_val, y_val = val[:, :-1], val[:, -1].astype(int)
 
             # Train the decision tree model
             model = DecisionTree(n_classes=self.n_classes)
             model.root, model.depth = model.decision_tree_learning(train, 0)
-            model.prune(train, val, acc_func=self.compute_accuracy, )
+            model.prune(val, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
             self.models.append(model)
 
             # Predict on the test set and compute confusion matrix of final tree
