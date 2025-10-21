@@ -59,8 +59,8 @@ def train(data, test_proportion, prune_proportion, seed):
     return (root, testing_data, pruning_data, depth)
 
 if __name__ == "__main__":
-    clean = np.loadtxt("clean_dataset.txt")
-    noisy = np.loadtxt("noisy_dataset.txt")
+    clean = np.loadtxt("../wifi_db/clean_dataset.txt")
+    noisy = np.loadtxt("../wifi_db/noisy_dataset.txt")
     min_depth = 1000000000
     # This is just for me because I wanted to test the visualisation at different depths no need to iterate through like this to make a decision tree
     # for i in range(1):
@@ -74,9 +74,10 @@ if __name__ == "__main__":
     # clean_root.draw_tree()
     print(f"Clean decision tree accuracy on clean test data before aggressive pruning = {100*test(clean_root,clean_testing_data)}%")
     print(f"Noisy decision tree accuracy on noisy test data before aggressive pruning = {100*test(noisy_root,noisy_testing_data)}%")
+    noisy_root.draw_tree()
     clean_root.prune_until_converged(clean_pruning_data,clean_root,test)
     noisy_root.prune_until_converged(noisy_pruning_data,noisy_root,test)
     print(f"Clean decision tree accuracy on clean test data after aggressive pruning = {100*test(clean_root,clean_testing_data)}%")
     print(f"Noisy decision tree accuracy on noisy test data after aggressive pruning = {100*test(noisy_root,noisy_testing_data)}%")
-    clean_root.draw_tree()
+    #clean_root.draw_tree()
     noisy_root.draw_tree()

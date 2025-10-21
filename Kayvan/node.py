@@ -6,7 +6,7 @@ class Node:
         self.value = value
         self.left_node = left_node
         self.right_node = right_node
-        self.leaf = leaf
+        self.leaf = leaf 
 
     def print_tree(self, indent=""):
         if self.leaf is True:
@@ -121,8 +121,8 @@ class Node:
 
         max_x = max(x for x, y in positions.values())
         max_y = max(y for x, y in positions.values())
-        fig_width = max(12, (max_x + 2) * 1.5)
-        fig_height = max(8, (max_y + 2) * 2.0)
+        fig_width = min(12, (max_x + 2) * 1.5)
+        fig_height = min(8, (max_y + 2) * 2.0)
 
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
         ax.set_aspect('equal')
