@@ -13,7 +13,7 @@ class KFoldValidator:
         self.data = data[np.random.default_rng(42).permutation(data.shape[0])]
 
         self.splits = self.split_data()
-        self.models = []
+        self.models = {'pruned': [], 'unpruned': []}
 
     def split_data(self):
         """Splits the data into k folds for cross-validation."""
@@ -44,10 +44,12 @@ class KFoldValidator:
         return splits
     
     def split_validation(self, ds, split_proportion=0.9):
+        """Splits the dataset into training and validation sets."""
         n_train = int(split_proportion * ds.shape[0])
         return ds[:n_train], ds[n_train:]
     
     def validate(self):
+        """Validates the model with and without pruning, returning the best result."""
         pruned_results = self.k_fold_validation()
         unpruned_results = self.k_fold_validation(prune=False)
         return pruned_results if pruned_results['accuracy'] >= unpruned_results['accuracy'] else unpruned_results
@@ -56,7 +58,9 @@ class KFoldValidator:
         """Performs k-fold cross-validation."""
         self.best_model = None
         best_accuracy = 0
+        label = 'unpruned' if not prune else 'pruned'
         cms = []
+        
         for train, test in self.splits:
             X_test, y_test = test[:, :-1], test[:, -1].astype(int)
             train, val = self.split_validation(train)
@@ -66,9 +70,10 @@ class KFoldValidator:
             model.root, model.depth = model.decision_tree_learning(train, 0)
             if prune:   
                 model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
-            self.models.append(model)
+                model.pruned = True
+            self.models[label].append(model)
 
-            # Predict on the test set and compute confusion matrix of final tree
+            # Predict on the test set and compute confusion matrix
             y_hat = model.predict(X_test)
             cm = self.confusion_matrix((y_test, y_hat))
             accuracy = self.compute_accuracy(cm)

@@ -6,12 +6,12 @@ from dataclasses import dataclass
 
 @dataclass
 class Node:
+    """Class representing a node in the decision tree."""
     attribute: int = None
     value: float = None
     left: 'Node' = None
     right: 'Node' = None
     terminal: bool = False
-    depth: int = 0
 
 class DecisionTree:
     def __init__(self, n_classes):
@@ -19,6 +19,7 @@ class DecisionTree:
         self.root = None
         self.depth = 0
         self.n_classes = n_classes
+        self.pruned = False
         
     def predict(self, X_test):
         """Predict the class labels for the given test data."""
@@ -40,19 +41,19 @@ class DecisionTree:
         
         # Return a leaf node if all labels are the same
         if np.all(y == y[0]):
-            return Node(value=int(y[0]), terminal=True, depth=depth), depth
+            return Node(value=int(y[0]), terminal=True), depth
 
         # Find the best split
         split_attribute, split_value, left, right = self.find_split(X, y)
         if split_attribute is None or left.size == 0 or right.size == 0:
             majority_class = int(np.argmax(np.bincount(y, minlength=self.n_classes + 1)))
-            return Node(value=majority_class, terminal=True, depth=depth), depth
+            return Node(value=majority_class, terminal=True), depth
 
         # Recursively build the left and right branches
         l_branch, l_depth = self.decision_tree_learning(ds[left], depth + 1)
         r_branch, r_depth = self.decision_tree_learning(ds[right], depth + 1)
 
-        return Node(attribute=split_attribute, value=split_value, left=l_branch, right=r_branch, terminal=False, depth=depth), max(l_depth, r_depth)
+        return Node(attribute=split_attribute, value=split_value, left=l_branch, right=r_branch, terminal=False), max(l_depth, r_depth)
 
     def find_split(self, X, y):
         """Finds the best attribute and value to split the data."""
@@ -112,36 +113,43 @@ class DecisionTree:
         return best_attribute, best_split_value, best_left, best_right
     
     def prune(self, val_ds, node, acc_func, cm_func, print_prunes=False):
+        """Prunes the decision tree using least-error pruning."""
         if not node or node.terminal:
             return
 
+        # Recursively prune left and right subtrees
         self.prune(val_ds, node.left, acc_func, cm_func, print_prunes)
         self.prune(val_ds, node.right, acc_func, cm_func, print_prunes)
 
+        # Evaluate accuracy before pruning
         X_val, y_val = val_ds[:, :-1], val_ds[:, -1].astype(int)
         old_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
 
-        def try_prune_to(new_value):
+        def try_to_prune(new_value):
+            # print("try")
+            """Tries to prune the node to a terminal node with new_value."""
             old_state = (node.attribute, node.value, node.left, node.right, node.terminal)
 
+            # Modify the node to be a terminal node
             node.attribute = None
             node.value = new_value
             node.left = None
             node.right = None
             node.terminal = True
 
+            # Evaluate accuracy after pruning and revert if accuracy decreases
             new_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
-
             if new_accuracy < old_accuracy:
                 (node.attribute, node.value, node.left, node.right, node.terminal) = old_state
             else:
                 if print_prunes:
                     print(f"Successful prune.")
 
+        # Try to prune the current node
         if node.left and node.left.terminal:
-            try_prune_to(node.left.value)
+            try_to_prune(node.left.value)
         if node.right and node.right.terminal:
-            try_prune_to(node.right.value)
+            try_to_prune(node.right.value)
 
 
     def vector_entropy(self, n, counts):
@@ -157,142 +165,73 @@ class DecisionTree:
         p = counts / counts.sum()
         return float(-(p * np.log2(p)).sum())
     
-    def compute_positions(self, node, depth=0, positions=None):
-        if positions is None:
-            positions = {}
-
-        if node.left and node.right:
-            self.compute_positions(node.left, depth + 1, positions)
-            self.compute_positions(node.right, depth + 1, positions)
-
-            left_x = positions[id(node.left)][1][0]
-            right_x = positions[id(node.right)][1][0]
-
-            x = (left_x + right_x) / 2
-
-        elif node.left:
-            self.compute_positions(node.left, depth + 1, positions)
-            x = positions[id(node.left)][1][0]
-
-        elif node.right:
-            self.compute_positions(node.right, depth + 1, positions)
-            x = positions[id(node.right)][1][0]
-
-        else:
-            leaf_x = sum(1 for _, (n, _) in positions.items() if n.terminal)
-            x = leaf_x
-
-        y = depth
-        positions[id(node)] = node, (x, y)
-        return positions
-    
     def draw_tree(self):
-        positions = self.compute_positions(self.root)
-
-        max_x = max(x for _, (n, (x, _)) in positions.items())
-        max_y = max(y for _, (n, (_, y)) in positions.items())
-        fig_width = min(12, (max_x + 2) * 1.5)
-        fig_height = min(8, (max_y + 2) * 2.0)
+        """Draws the decision tree."""
+        positions = self.compute_positions(self.root, 0)
+        scale_x, scale_y = 2.0, 3.0
+        
+        # Determine figure size based on tree dimensions
+        max_x = max(x for _, x, _ in positions.values())
+        max_y = max(y for _, _, y in positions.values())
+        fig_width = (max_x + 2) * scale_x / 2
+        fig_height = (max_y + 2) * scale_y / 2
 
         fig, ax = plt.subplots(figsize=(fig_width, fig_height))
         ax.set_aspect('equal')
+        ax.invert_yaxis()
         ax.axis('off')
 
-        scale_x = 2.0 
-        scale_y = 3.0
-        ax.invert_yaxis()
-
         def draw_edges(node):
-            if node.left:
-                x1, y1 = positions[id(node)][1]
-                x2, y2 = positions[id(node.left)][1]
-                ax.plot([x1 * scale_x, x2 * scale_x], [y1 * scale_y, y2 * scale_y], 'k-', zorder=1)
-                draw_edges(node.left)
-            if node.right:
-                x1, y1 = positions[id(node)][1]
-                x2, y2 = positions[id(node.right)][1]
-                ax.plot([x1 * scale_x, x2 * scale_x], [y1 * scale_y, y2 * scale_y], 'k-', zorder=1)
-                draw_edges(node.right)
+            """Recursively draws edges between nodes."""
+            if node.terminal:
+                return 
+            
+            _, x, y = positions[id(node)]
+            x1, y1 = x * scale_x, y * scale_y
+
+            # Draw edges from parent to each childs
+            for child in (node.left, node.right):
+                if not child:
+                    continue
+
+                _, x, y = positions[id(child)]
+                x2, y2 = x * scale_x, y * scale_y
+                ax.plot([x1, x2], [y1, y2], 'k-', zorder=1)
+                draw_edges(child)
 
         draw_edges(self.root)
 
-        for _, (n, (x, y)) in positions.items():
-            x *= scale_x
-            y *= scale_y
-
-            circle = plt.Circle((x, y), 0.6, color='skyblue', ec='black', zorder=2)
-            ax.add_patch(circle)
-
-            if n.terminal:
-                label = f"Class:\n{n.value}"
-            else:
-                label = f"Attr {n.attribute}\n< {n.value:.1f}"
-
-            ax.text(x, y, label, ha='center', va='center', fontsize=8, fontweight='bold', zorder=3)
+        # Draw the nodes and their labels
+        for n, x, y in positions.values():
+            x1, y1 = x * scale_x, y * scale_y
+            ax.add_patch(plt.Circle((x1, y1), 0.6, color='skyblue', ec='black', zorder=2))
+            label = f"Class:\n{n.value}" if n.terminal else f"Attr {n.attribute}\n< {n.value:.1f}"
+            ax.text(x1, y1, label, ha='center', va='center', fontsize=9, fontweight='bold', zorder=3)
 
         plt.tight_layout()
         plt.show()
 
-    def visualise_tree(self, figsize):
-        """Plots the decision tree."""
-        fig, ax = plt.subplots(figsize=figsize)
-        root = self.root
-        counter = itertools.count()
-        pos = {}
-        
-        def traverse_inorder(n, depth):
-            """In-order traversal to assign positions to nodes."""
-            if n is None:
-                return
-            if not n.terminal:
-                traverse_inorder(n.left, depth + 1)
-            pos[id(n)] = (next(counter), -depth)
-            if not n.terminal:
-                traverse_inorder(n.right, depth + 1)
+    def compute_positions(self, node, depth, positions=None):
+        """Computes the (x, y) positions for each node in the tree."""
+        if not node:
+            return positions
 
-        traverse_inorder(root, 0)
+        if positions is None:
+            positions = {}
 
-        # Normalize x-coordinates
-        xs = [x for x, _ in pos.values()]
-        x_min, x_max = min(xs), max(xs)
-        span = max(1, x_max - x_min + 1)
-        for k, (x, y) in pos.items():
-            pos[k] = ((x - x_min + 0.5) / span, y)
+        # Recursively compute positions for child nodes
+        if not node.terminal:
+            self.compute_positions(node.left, depth + 1, positions)
+            self.compute_positions(node.right, depth + 1, positions)
 
-        
-        def label(n):
-            """Generates the label for a node."""
-            if n.terminal:
-                return f"R{int(n.value)}"
-            return f"X{n.attribute} ≤ {n.value}"
+            # Compute x position based on child nodes
+            left_x = positions.get(id(node.left), (None, 0, 0))[1]
+            right_x = positions.get(id(node.right), (None, 0, 0))[1]
+            x = (left_x + right_x) / 2
+        else:
+            # Compute x position for terminal nodes
+            x = sum(1 for n, _, _ in positions.values() if n.terminal) 
 
-        def draw_edges(n):
-            """Draws the edges of the tree."""
-            if n is None or n.terminal:
-                return
-            x0, y0 = pos[id(n)]
-            for child in [n.left, n.right]:
-                x1, y1 = pos[id(child)]
-                ax.plot([x0, x1], [y0, y1], color='black')
-                draw_edges(child)
-
-        def collect(n, out):
-            """Collects all nodes in the tree."""
-            if n is None:
-                return
-            out.append(n)
-            collect(n.left, out)
-            collect(n.right, out)
-
-        nodes = []
-        draw_edges(root)
-        collect(root, nodes)
-
-        # Draw nodes
-        for n in nodes:
-            x, y = pos[id(n)]
-            ax.text(x, y, label(n), ha='center', va='center', bbox=dict(boxstyle="round,pad=0.2", fc="white", ec="black", lw=1.2), fontsize=6)
-
-        ax.axis('off')
-        plt.tight_layout()
-        plt.show()
+        # Store the position of the current node
+        positions[id(node)] = (node, x, depth)
+        return positions
