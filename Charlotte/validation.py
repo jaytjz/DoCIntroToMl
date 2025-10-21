@@ -57,7 +57,9 @@ class KFoldValidator:
             # Train the decision tree model
             model = DecisionTree(n_classes=self.n_classes)
             model.root, model.depth = model.decision_tree_learning(train, 0)
+            # model.visualise_tree(figsize=(10, 7))
             model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
+            # model.visualise_tree(figsize=(10, 7))
             self.models.append(model)
 
             # Predict on the test set and compute confusion matrix of final tree
