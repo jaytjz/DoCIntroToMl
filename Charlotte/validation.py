@@ -1,5 +1,5 @@
 import numpy as np
-from decision_tree import DecisionTree
+from Charlotte.decision_tree import DecisionTree
 
 class KFoldValidator:
     def __init__(self, ds_filename, n_classes=4, k=10):
@@ -42,6 +42,10 @@ class KFoldValidator:
             current = stop
 
         return splits
+    
+    def split_validation(self, ds, split_proportion=0.9):
+        n_train = int(split_proportion * ds.shape[0])
+        return ds[:n_train], ds[n_train:]
 
     def k_fold_validation(self):
         """Performs k-fold cross-validation."""
@@ -49,12 +53,18 @@ class KFoldValidator:
         for train, test in self.splits:
             X_test, y_test = test[:, :-1], test[:, -1].astype(int)
 
-            # Train the decision tree model
-            model = DecisionTree(n_classes=self.n_classes)
-            model.root, model.depth = model.decision_tree_learning(train, 0)
-            self.models.append(model)
+            train, val = self.split_validation(train)
+            X_val, y_val = val[:, :-1], val[:, -1].astype(int)
 
-            # Predict on the test set and compute confusion matrix
+            # Todo: Pruning
+            model = None
+
+            # Train the decision tree model
+            # model = DecisionTree(n_classes=self.n_classes)
+            # model.root, model.depth = model.decision_tree_learning(train, 0)
+            # self.models.append(model)
+
+            # Predict on the test set and compute confusion matrix of final tree
             y_hat = model.predict(X_test)
             cm = self.confusion_matrix((y_test, y_hat))
             cms.append(cm)
