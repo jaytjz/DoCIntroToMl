@@ -1,5 +1,5 @@
 import numpy as np
-from Charlotte.decision_tree import DecisionTree
+from decision_tree import DecisionTree
 
 class KFoldValidator:
     def __init__(self, ds_filename, n_classes=4, k=10):
@@ -57,7 +57,7 @@ class KFoldValidator:
             # Train the decision tree model
             model = DecisionTree(n_classes=self.n_classes)
             model.root, model.depth = model.decision_tree_learning(train, 0)
-            model.prune(val, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
+            model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
             self.models.append(model)
 
             # Predict on the test set and compute confusion matrix of final tree
