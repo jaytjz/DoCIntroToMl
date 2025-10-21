@@ -46,9 +46,16 @@ class KFoldValidator:
     def split_validation(self, ds, split_proportion=0.9):
         n_train = int(split_proportion * ds.shape[0])
         return ds[:n_train], ds[n_train:]
+    
+    def validate(self):
+        pruned_results = self.k_fold_validation()
+        unpruned_results = self.k_fold_validation(prune=False)
+        return pruned_results if pruned_results['accuracy'] >= unpruned_results['accuracy'] else unpruned_results
 
-    def k_fold_validation(self):
+    def k_fold_validation(self, prune=True):
         """Performs k-fold cross-validation."""
+        self.best_model = None
+        best_accuracy = 0
         cms = []
         for train, test in self.splits:
             X_test, y_test = test[:, :-1], test[:, -1].astype(int)
@@ -57,14 +64,17 @@ class KFoldValidator:
             # Train the decision tree model
             model = DecisionTree(n_classes=self.n_classes)
             model.root, model.depth = model.decision_tree_learning(train, 0)
-            # model.visualise_tree(figsize=(10, 7))
-            model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
-            # model.visualise_tree(figsize=(10, 7))
+            if prune:   
+                model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
             self.models.append(model)
 
             # Predict on the test set and compute confusion matrix of final tree
             y_hat = model.predict(X_test)
             cm = self.confusion_matrix((y_test, y_hat))
+            accuracy = self.compute_accuracy(cm)
+            if accuracy > best_accuracy:
+                best_accuracy = accuracy
+                self.best_model = model
             cms.append(cm)
 
         return self.evaluate(cms, False)

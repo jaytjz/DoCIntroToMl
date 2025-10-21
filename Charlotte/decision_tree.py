@@ -115,9 +115,6 @@ class DecisionTree:
         if not node or node.terminal:
             return
 
-        # if not (node.left.terminal and node.right.terminal):
-        #     return
-        
         self.prune(val_ds, node.left, acc_func, cm_func, print_prunes)
         self.prune(val_ds, node.right, acc_func, cm_func, print_prunes)
 
@@ -125,16 +122,8 @@ class DecisionTree:
         old_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
 
         def try_prune_to(new_value):
-            """Closure that mutates `node` in place."""
-            old_state = (
-                node.attribute,
-                node.value,
-                node.left,
-                node.right,
-                node.terminal,
-            )
+            old_state = (node.attribute, node.value, node.left, node.right, node.terminal)
 
-            # --- mutate node directly ---
             node.attribute = None
             node.value = new_value
             node.left = None
@@ -144,19 +133,11 @@ class DecisionTree:
             new_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
 
             if new_accuracy < old_accuracy:
-                # rollback
-                (
-                    node.attribute,
-                    node.value,
-                    node.left,
-                    node.right,
-                    node.terminal,
-                ) = old_state
+                (node.attribute, node.value, node.left, node.right, node.terminal) = old_state
             else:
                 if print_prunes:
-                    print(f"✅ Successful prune at depth {node.depth} (value={new_value})")
+                    print(f"Successful prune.")
 
-        # --- Try pruning to each child’s terminal value ---
         if node.left and node.left.terminal:
             try_prune_to(node.left.value)
         if node.right and node.right.terminal:
@@ -175,6 +156,82 @@ class DecisionTree:
         _, counts = np.unique(y, return_counts=True)
         p = counts / counts.sum()
         return float(-(p * np.log2(p)).sum())
+    
+    def compute_positions(self, node, depth=0, positions=None):
+        if positions is None:
+            positions = {}
+
+        if node.left and node.right:
+            self.compute_positions(node.left, depth + 1, positions)
+            self.compute_positions(node.right, depth + 1, positions)
+
+            left_x = positions[id(node.left)][1][0]
+            right_x = positions[id(node.right)][1][0]
+
+            x = (left_x + right_x) / 2
+
+        elif node.left:
+            self.compute_positions(node.left, depth + 1, positions)
+            x = positions[id(node.left)][1][0]
+
+        elif node.right:
+            self.compute_positions(node.right, depth + 1, positions)
+            x = positions[id(node.right)][1][0]
+
+        else:
+            leaf_x = sum(1 for _, (n, _) in positions.items() if n.terminal)
+            x = leaf_x
+
+        y = depth
+        positions[id(node)] = node, (x, y)
+        return positions
+    
+    def draw_tree(self):
+        positions = self.compute_positions(self.root)
+
+        max_x = max(x for _, (n, (x, _)) in positions.items())
+        max_y = max(y for _, (n, (_, y)) in positions.items())
+        fig_width = min(12, (max_x + 2) * 1.5)
+        fig_height = min(8, (max_y + 2) * 2.0)
+
+        fig, ax = plt.subplots(figsize=(fig_width, fig_height))
+        ax.set_aspect('equal')
+        ax.axis('off')
+
+        scale_x = 2.0 
+        scale_y = 3.0
+        ax.invert_yaxis()
+
+        def draw_edges(node):
+            if node.left:
+                x1, y1 = positions[id(node)][1]
+                x2, y2 = positions[id(node.left)][1]
+                ax.plot([x1 * scale_x, x2 * scale_x], [y1 * scale_y, y2 * scale_y], 'k-', zorder=1)
+                draw_edges(node.left)
+            if node.right:
+                x1, y1 = positions[id(node)][1]
+                x2, y2 = positions[id(node.right)][1]
+                ax.plot([x1 * scale_x, x2 * scale_x], [y1 * scale_y, y2 * scale_y], 'k-', zorder=1)
+                draw_edges(node.right)
+
+        draw_edges(self.root)
+
+        for _, (n, (x, y)) in positions.items():
+            x *= scale_x
+            y *= scale_y
+
+            circle = plt.Circle((x, y), 0.6, color='skyblue', ec='black', zorder=2)
+            ax.add_patch(circle)
+
+            if n.terminal:
+                label = f"Class:\n{n.value}"
+            else:
+                label = f"Attr {n.attribute}\n< {n.value:.1f}"
+
+            ax.text(x, y, label, ha='center', va='center', fontsize=8, fontweight='bold', zorder=3)
+
+        plt.tight_layout()
+        plt.show()
 
     def visualise_tree(self, figsize):
         """Plots the decision tree."""
