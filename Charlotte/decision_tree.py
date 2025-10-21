@@ -112,31 +112,56 @@ class DecisionTree:
         return best_attribute, best_split_value, best_left, best_right
     
     def prune(self, val_ds, node, acc_func, cm_func, print_prunes=False):
-        if not node.terminal:
-            self.prune(val_ds, node.left, acc_func, cm_func, print_prunes)
-            self.prune(val_ds, node.right, acc_func, cm_func, print_prunes)
+        if not node or node.terminal:
+            return
 
-            X_val, y_val = val_ds[:, :-1], val_ds[:, -1].astype(int)
-            old_node = node
-            
-            def try_prune_to(X_val, y_val, new_value, old_node):
-                old_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
+        # if not (node.left.terminal and node.right.terminal):
+        #     return
+        
+        self.prune(val_ds, node.left, acc_func, cm_func, print_prunes)
+        self.prune(val_ds, node.right, acc_func, cm_func, print_prunes)
 
-                new_node = Node(value=new_value, terminal=True)
-                new_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
+        X_val, y_val = val_ds[:, :-1], val_ds[:, -1].astype(int)
+        old_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
 
-                if new_accuracy < old_accuracy:
-                    return old_node
-                else:
-                    if print_prunes:
-                        print("Succesful prune")
+        def try_prune_to(new_value):
+            """Closure that mutates `node` in place."""
+            old_state = (
+                node.attribute,
+                node.value,
+                node.left,
+                node.right,
+                node.terminal,
+            )
 
-                return new_node
+            # --- mutate node directly ---
+            node.attribute = None
+            node.value = new_value
+            node.left = None
+            node.right = None
+            node.terminal = True
 
-            if node.left and node.left.terminal:
-                node.left = try_prune_to(X_val, y_val, node.left.value, old_node)
-            if node.right and node.right.terminal:
-                node.right = try_prune_to(X_val, y_val, node.right.value, old_node)
+            new_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
+
+            if new_accuracy < old_accuracy:
+                # rollback
+                (
+                    node.attribute,
+                    node.value,
+                    node.left,
+                    node.right,
+                    node.terminal,
+                ) = old_state
+            else:
+                if print_prunes:
+                    print(f"✅ Successful prune at depth {node.depth} (value={new_value})")
+
+        # --- Try pruning to each child’s terminal value ---
+        if node.left and node.left.terminal:
+            try_prune_to(node.left.value)
+        if node.right and node.right.terminal:
+            try_prune_to(node.right.value)
+
 
     def vector_entropy(self, n, counts):
         """Calculates the entropy for a batch of class-count rows."""

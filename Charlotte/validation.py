@@ -81,7 +81,7 @@ class KFoldValidator:
     def compute_accuracy(self, confusion_matrix):
         """Computes the accuracy from the confusion matrix."""
         total = np.sum(confusion_matrix)
-        correct = np.diag(confusion_matrix)
+        correct = np.sum(np.diag(confusion_matrix))
         return (correct / total) if total > 0 else 0
 
     def evaluate(self, confusion_matrices, single_fold=True):
