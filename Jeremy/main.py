@@ -27,7 +27,7 @@ def main():
     decisionTree = DecisionTree(data_train)
     predicted = decisionTree.predict(data_test[:, :-1])
     print("clean accuracy", compute_accuracy(data_test[:, -1], predicted))
-    decisionTree.print_tree()
+    #decisionTree.print_tree()
 
 if __name__ == '__main__':
     main()
