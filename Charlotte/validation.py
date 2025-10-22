@@ -71,6 +71,7 @@ class KFoldValidator:
             if prune:   
                 model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
                 model.pruned = True
+                model.recompute_depth()
             self.models[label].append(model)
 
             # Predict on the test set and compute confusion matrix
@@ -118,3 +119,9 @@ class KFoldValidator:
         f1_score_per_class = np.divide(precision_recall_prod, precision_recall_sum, out=np.zeros_like(precision_recall_prod, dtype=float), where=(precision_recall_sum != 0))
 
         return {'confusion_matrix': cm, 'accuracy': accuracy, 'precision_per_class': precision_per_class, 'recall_per_class': recall_per_class, 'f1_score_per_class': f1_score_per_class}
+
+    def get_average_model_depths(self):
+        """Returns the average depths of pruned and unpruned models."""
+        avg_pruned_depth = np.mean([model.depth for model in self.models['pruned']])
+        avg_unpruned_depth = np.mean([model.depth for model in self.models['unpruned']])
+        return {'pruned': avg_pruned_depth, 'unpruned': avg_unpruned_depth}

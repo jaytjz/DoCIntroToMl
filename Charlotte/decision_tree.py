@@ -151,6 +151,14 @@ class DecisionTree:
         if node.right and node.right.terminal:
             try_to_prune(node.right.value)
 
+    def recompute_depth(self):
+        """Recomputes the depth of the tree."""
+        def compute_depth(node):
+            if not node or node.terminal:
+                return 0
+            return 1 + max(compute_depth(node.left), compute_depth(node.right))
+        
+        self.depth = compute_depth(self.root)
 
     def vector_entropy(self, n, counts):
         """Calculates the entropy for a batch of class-count rows."""
