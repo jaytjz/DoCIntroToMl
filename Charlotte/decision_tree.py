@@ -1,6 +1,4 @@
-from platform import node
 import numpy as np
-import itertools
 import matplotlib.pyplot as plt
 from dataclasses import dataclass
 
@@ -126,7 +124,6 @@ class DecisionTree:
         old_accuracy = acc_func(cm_func((y_val, self.predict(X_val))))
 
         def try_to_prune(new_value):
-            # print("try")
             """Tries to prune the node to a terminal node with new_value."""
             old_state = (node.attribute, node.value, node.left, node.right, node.terminal)
 

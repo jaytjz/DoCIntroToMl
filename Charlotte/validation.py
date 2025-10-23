@@ -2,24 +2,23 @@ import numpy as np
 from decision_tree import DecisionTree
 
 class KFoldValidator:
-    def __init__(self, ds_filename, n_classes=4, k=10):
+    def __init__(self, ds_filename, n_classes=4, k=10, prune=True):
         """Initializes the KFoldValidator."""
         self.ds_filename = ds_filename
         self.k = k
         self.n_classes = n_classes
+        self.prune = prune
 
         # Load and shuffle the dataset
         data = np.loadtxt(ds_filename)
         self.data = data[np.random.default_rng(42).permutation(data.shape[0])]
 
-        self.splits = self.split_data()
-        self.models = {'pruned': [], 'unpruned': []}
+        self.splits = self.split_data(self.data, k)
+        self.models = []
 
-    def split_data(self):
+    def split_data(self, data, k):
         """Splits the data into k folds for cross-validation."""
-        data = self.data
         n = data.shape[0]
-        k = self.k
 
         # Determine the size of each fold
         fold_sizes = np.full(k, n // k, dtype=int)
@@ -43,47 +42,75 @@ class KFoldValidator:
 
         return splits
     
-    def split_validation(self, ds, split_proportion=0.9):
-        """Splits the dataset into training and validation sets."""
-        n_train = int(split_proportion * ds.shape[0])
-        return ds[:n_train], ds[n_train:]
+    def split_validation(self, data):
+        split = 0.9 * data.shape[0]
+        train = data[:int(split)]
+        test = data[int(split):]
+        return train, test
     
     def validate(self):
-        """Validates the model with and without pruning, returning the best result."""
-        pruned_results = self.k_fold_validation()
-        unpruned_results = self.k_fold_validation(prune=False)
-        return pruned_results if pruned_results['accuracy'] >= unpruned_results['accuracy'] else unpruned_results
+        """Validates the model with or without pruning."""
+        return self.k_fold_validation(prune=self.prune)
 
     def k_fold_validation(self, prune=True):
         """Performs k-fold cross-validation."""
         self.best_model = None
-        best_accuracy = 0
-        label = 'unpruned' if not prune else 'pruned'
+        self.best_accuracy = 0
         cms = []
         
         for train, test in self.splits:
             X_test, y_test = test[:, :-1], test[:, -1].astype(int)
-            train, val = self.split_validation(train)
 
-            # Train the decision tree model
-            model = DecisionTree(n_classes=self.n_classes)
-            model.root, model.depth = model.decision_tree_learning(train, 0)
+            # Train pruned decision tree models using internal k-fold validation
             if prune:   
-                model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
-                model.pruned = True
-                model.recompute_depth()
-            self.models[label].append(model)
+                pruned_cms = self.prune_k_fold_validation(train, ki=self.k - 1) 
+                cms += pruned_cms
+            # Train the unpruned decision tree model
+            else:
+                # Train the decision tree model
+                model = DecisionTree(n_classes=self.n_classes)
+                model.root, model.depth = model.decision_tree_learning(train, 0)
+                self.models.append(model)
 
-            # Predict on the test set and compute confusion matrix
-            y_hat = model.predict(X_test)
-            cm = self.confusion_matrix((y_test, y_hat))
-            accuracy = self.compute_accuracy(cm)
-            if accuracy > best_accuracy:
-                best_accuracy = accuracy
-                self.best_model = model
-            cms.append(cm)
+                # Evaluate the unpruned model
+                y_hat = model.predict(X_test)
+                cm = self.confusion_matrix((y_test, y_hat))
+                cms.append(cm)
+
+                acc = self.compute_accuracy(cm)
+                if acc > self.best_accuracy:
+                    self.best_accuracy = acc
+                    self.best_model = model
 
         return self.evaluate(cms, False)
+    
+    def prune_k_fold_validation(self, data, ki=9):
+        """Performs internal k-fold cross-validation with pruning."""
+        internal_splits = self.split_data(data, ki)
+        cms = []
+
+        for train, val in internal_splits:
+            X_val, y_val = val[:, :-1], val[:, -1].astype(int)
+            
+            # Train and prune the decision tree model
+            model = DecisionTree(n_classes=self.n_classes)
+            model.root, model.depth = model.decision_tree_learning(train, 0)
+            model.prune(val, model.root, acc_func=self.compute_accuracy, cm_func=self.confusion_matrix)
+            model.recompute_depth()
+            model.pruned = True
+            self.models.append(model)
+
+            # Evaluate the pruned model
+            y_hat = model.predict(X_val)
+            cm = self.confusion_matrix((y_val, y_hat))
+            cms.append(cm)
+
+            acc = self.compute_accuracy(cm)
+            if acc > self.best_accuracy:
+                self.best_accuracy = acc
+                self.best_model = model
+            
+        return cms
 
     def confusion_matrix(self, data_to_evaluate):
         """Computes the confusion matrix for the given true and predicted labels."""
@@ -105,6 +132,7 @@ class KFoldValidator:
     def evaluate(self, confusion_matrices, single_fold=True):
         """Evaluates the model performance using the confusion matrices."""
         cm = confusion_matrices if single_fold else np.sum(confusion_matrices, axis=0)
+        averaged_cm = np.array2string(np.mean(confusion_matrices, axis=0), formatter={'float_kind': lambda x: "%.2f" % x})
         tp = np.diag(cm)
         col_sum = np.sum(cm, axis=0)
         row_sum = np.sum(cm, axis=1)
@@ -117,11 +145,9 @@ class KFoldValidator:
         precision_recall_sum = precision_per_class + recall_per_class
         precision_recall_prod = 2.0 * precision_per_class * recall_per_class
         f1_score_per_class = np.divide(precision_recall_prod, precision_recall_sum, out=np.zeros_like(precision_recall_prod, dtype=float), where=(precision_recall_sum != 0))
+        
+        return {'confusion_matrix': cm, 'average_confusion_matrix': averaged_cm, 'accuracy': accuracy, 'precision_per_class': precision_per_class, 'recall_per_class': recall_per_class, 'f1_score_per_class': f1_score_per_class}
 
-        return {'confusion_matrix': cm, 'accuracy': accuracy, 'precision_per_class': precision_per_class, 'recall_per_class': recall_per_class, 'f1_score_per_class': f1_score_per_class}
-
-    def get_average_model_depths(self):
-        """Returns the average depths of pruned and unpruned models."""
-        avg_pruned_depth = np.mean([model.depth for model in self.models['pruned']])
-        avg_unpruned_depth = np.mean([model.depth for model in self.models['unpruned']])
-        return {'pruned': avg_pruned_depth, 'unpruned': avg_unpruned_depth}
+    def get_average_model_depth(self):
+        """Returns the average depth of the models."""
+        return np.mean([model.depth for model in self.models])
