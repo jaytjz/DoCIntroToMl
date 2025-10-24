@@ -76,7 +76,7 @@ def shuffle(data, max_depth):
     tree = DecisionTree()
     tree.fit(df_train, max_depth)
     print(f"Tree depth: {tree.depth}")
-    # plot_tree(tree.root, tree.depth)
+    plot_tree(tree.root, tree.depth)
 
     return df_test, tree
     
