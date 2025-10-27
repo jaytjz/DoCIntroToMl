@@ -68,6 +68,12 @@ The goal is to explore how well classical decision tree learning can separate sp
    pip install -r requirements.txt
    ```
 
+### Running the Script
+
+```bash
+   python3 main.py
+```
+
 ## What the Script Does
 
 When you run `main.py`, it will:
