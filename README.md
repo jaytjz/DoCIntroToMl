@@ -48,7 +48,6 @@ The goal is to explore how well classical decision tree learning can separate sp
 ├── decision_tree.py            # Decision Tree implementation
 ├── validation.py               # Validation logic for model evaluation
 ├── report_plots.ipynb          # Jupyter notebook for generating tree and confusion matrix plots
-├── evaluation.ipynb            # Jupyter notebook for evaluation experiments
 └── wifi_db/
     ├── clean_dataset.txt      # Clean WiFi signal dataset
     └── noisy_dataset.txt      # Noisy WiFi signal dataset
@@ -77,6 +76,10 @@ When you run `main.py`, it will:
 - Train a Decision Tree (Information Gain) on the training set with stopping rules; use the validation set for pruning/tuning; evaluate on the held-out test fold and record metrics.
 - If skipping validation-based pruning, train on all 9 folds (~90%) and test on the held-out fold.
 - Report accuracy, precision, recall, and F1-score over the 10 test folds on the clean dataset.
+
+## Jupyter notebook
+
+Our plots for the report were generated using the code in `report_plots.ipynb`, additionally we have also added plots to demonstrate the effect pruning has on the size and accuracy of the decision trees.
 
 ## Dependencies
 
