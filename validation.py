@@ -2,17 +2,17 @@ import numpy as np
 from decision_tree import DecisionTree
 
 class KFoldValidator:
-    def __init__(self, ds_filename, n_classes=4, k=10, prune=True):
+    def __init__(self, ds_filename, k=10, prune=True):
         """Initializes the KFoldValidator."""
         self.ds_filename = ds_filename
         self.k = k
-        self.n_classes = n_classes
         self.prune = prune
 
         # Load and shuffle the dataset
         data = np.loadtxt(ds_filename)
         self.data = data[np.random.default_rng(42).permutation(data.shape[0])]
-
+        self.n_classes = int(np.max(self.data[:, -1]))
+        
         self.splits = self.split_data(self.data, k)
         self.models = []
 
@@ -63,7 +63,7 @@ class KFoldValidator:
 
             # Train pruned decision tree models using internal k-fold validation
             if prune:   
-                pruned_cms = self.prune_k_fold_validation(train, ki=self.k - 1) 
+                pruned_cms = self.prune_k_fold_validation(train, test, ki=self.k - 1) 
                 cms += pruned_cms
             # Train the unpruned decision tree model
             else:
@@ -83,14 +83,15 @@ class KFoldValidator:
                     self.best_model = model
 
         return self.evaluate(cms, False)
-    
-    def prune_k_fold_validation(self, data, ki=9):
+
+    def prune_k_fold_validation(self, data, test, ki=9):
         """Performs internal k-fold cross-validation with pruning."""
         internal_splits = self.split_data(data, ki)
         cms = []
 
         for train, val in internal_splits:
             X_val, y_val = val[:, :-1], val[:, -1].astype(int)
+            X_test, y_test = test[:, :-1], test[:, -1].astype(int)
             
             # Train and prune the decision tree model
             model = DecisionTree(n_classes=self.n_classes)
@@ -101,9 +102,13 @@ class KFoldValidator:
             self.models.append(model)
 
             # Evaluate the pruned model
-            y_hat = model.predict(X_val)
-            cm = self.confusion_matrix((y_val, y_hat))
+            y_hat = model.predict(X_test)
+            cm = self.confusion_matrix((y_test, y_hat))
             cms.append(cm)
+            
+            # y_hat = model.predict(X_val)
+            # cm = self.confusion_matrix((y_val, y_hat))
+            # cms.append(cm)
 
             acc = self.compute_accuracy(cm)
             if acc > self.best_accuracy:
