@@ -1,7 +1,7 @@
 from validation import KFoldValidator
 
 if __name__ == "__main__":
-    validator = KFoldValidator('wifi_db/noisy_dataset.txt', k=10)
+    validator = KFoldValidator('wifi_db/clean_dataset.txt', k=10)
     results = validator.validate()
     
     print("Data Results:\n")

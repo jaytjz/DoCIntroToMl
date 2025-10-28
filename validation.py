@@ -105,10 +105,6 @@ class KFoldValidator:
             y_hat = model.predict(X_test)
             cm = self.confusion_matrix((y_test, y_hat))
             cms.append(cm)
-            
-            # y_hat = model.predict(X_val)
-            # cm = self.confusion_matrix((y_val, y_hat))
-            # cms.append(cm)
 
             acc = self.compute_accuracy(cm)
             if acc > self.best_accuracy:
