@@ -82,6 +82,7 @@ The goal is to explore how well decision tree learning can separate spatial clas
    ```
 
 ### Running the Script
+Before running the script, make sure you are in the directory that contains `main.py`.
 
 ```bash
    python3 main.py
